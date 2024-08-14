@@ -139,30 +139,6 @@ FHOST_EXT_OVERRIDE = {
     "text/x-diff" : ".diff",
 }
 
-
-# Control which files aren't allowed to be uploaded
-#
-# Certain kinds of files are never accepted.  If the file claims to be one of
-# these types of files, or if we look at the contents of the file and it looks
-# like one of these filetypes, then we reject the file outright with a 415
-# UNSUPPORTED MEDIA EXCEPTION
-FHOST_MIME_BLACKLIST = [
-    "application/x-dosexec",
-    "application/java-archive",
-    "application/java-vm"
-]
-
-
-# A list of IP addresses which are blacklisted from uploading files
-#
-# Can be set to the path of a file with an IP address on each line.  The file
-# can also include comment lines using a pound sign (#).  Paths are resolved
-# relative to the instance/ directory.
-#
-# If this is set to None, then no IP blacklist will be consulted.
-FHOST_UPLOAD_BLACKLIST = None
-
-
 # Enables support for detecting NSFW images
 #
 # Consult README.md for additional dependencies before setting to True

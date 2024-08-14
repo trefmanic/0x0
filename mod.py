@@ -11,8 +11,9 @@ from textual.screen import Screen
 from textual import log
 from rich.text import Text
 from jinja2.filters import do_filesizeformat
+import ipaddress
 
-from fhost import db, File, su, app as fhost_app, in_upload_bl
+from fhost import db, File, AddrFilter, su, app as fhost_app
 from modui import *
 
 fhost_app.app_context().push()
@@ -57,7 +58,7 @@ class NullptrMod(Screen):
         if self.current_file:
             match fcol:
                 case 1: self.finput.value = ""
-                case 2: self.finput.value = self.current_file.addr
+                case 2: self.finput.value = self.current_file.addr.compressed
                 case 3: self.finput.value = self.current_file.mime
                 case 4: self.finput.value = self.current_file.ext
                 case 5: self.finput.value = self.current_file.ua or ""
@@ -72,7 +73,14 @@ class NullptrMod(Screen):
                 case 1:
                     try: ftable.query = ftable.base_query.filter(File.id == su.debase(message.value))
                     except ValueError: pass
-                case 2: ftable.query = ftable.base_query.filter(File.addr.like(message.value))
+                case 2:
+                    try:
+                        addr = ipaddress.ip_address(message.value)
+                        if type(addr) is ipaddress.IPv6Address:
+                            addr = addr.ipv4_mapped or addr
+                        q = ftable.base_query.filter(File.addr == addr)
+                        ftable.query = q
+                    except ValueError: pass
                 case 3: ftable.query = ftable.base_query.filter(File.mime.like(message.value))
                 case 4: ftable.query = ftable.base_query.filter(File.ext.like(message.value))
                 case 5: ftable.query = ftable.base_query.filter(File.ua.like(message.value))
@@ -88,27 +96,24 @@ class NullptrMod(Screen):
 
     def action_ban_ip(self, nuke: bool) -> None:
         if self.current_file:
-            if not fhost_app.config["FHOST_UPLOAD_BLACKLIST"]:
-                self.mount(Notification("Failed: FHOST_UPLOAD_BLACKLIST not set!"))
-                return
+            if AddrFilter.query.filter(AddrFilter.addr ==
+                                       self.current_file.addr).scalar():
+                txt = f"{self.current_file.addr.compressed} is already banned"
             else:
-                if in_upload_bl(self.current_file.addr):
-                    txt = f"{self.current_file.addr} is already banned"
-                else:
-                    with fhost_app.open_instance_resource(fhost_app.config["FHOST_UPLOAD_BLACKLIST"], "a") as bl:
-                        print(self.current_file.addr.lstrip("::ffff:"), file=bl)
-                    txt = f"Banned {self.current_file.addr}"
+                db.session.add(AddrFilter(self.current_file.addr))
+                db.session.commit()
+                txt = f"Banned {self.current_file.addr.compressed}"
 
-                if nuke:
-                    tsize = 0
-                    trm = 0
-                    for f in File.query.filter(File.addr == self.current_file.addr):
-                        if f.getpath().is_file():
-                            tsize += f.size or f.getpath().stat().st_size
-                            trm += 1
-                        f.delete(True)
-                    db.session.commit()
-                    txt += f", removed {trm} {'files' if trm != 1 else 'file'} totaling {do_filesizeformat(tsize, True)}"
+            if nuke:
+                tsize = 0
+                trm = 0
+                for f in File.query.filter(File.addr == self.current_file.addr):
+                    if f.getpath().is_file():
+                        tsize += f.size or f.getpath().stat().st_size
+                        trm += 1
+                    f.delete(True)
+                db.session.commit()
+                txt += f", removed {trm} {'files' if trm != 1 else 'file'} totaling {do_filesizeformat(tsize, True)}"
             self.mount(Notification(txt))
             self._refresh_layout()
             ftable = self.query_one("#ftable")
@@ -252,7 +257,7 @@ class NullptrMod(Screen):
             ("File size:", do_filesizeformat(f.size, True)),
             ("MIME type:", f.mime),
             ("SHA256 checksum:", f.sha256),
-            ("Uploaded by:", Text(f.addr)),
+            ("Uploaded by:", Text(f.addr.compressed)),
             ("User agent:", Text(f.ua or "")),
             ("Management token:", f.mgmt_token),
             ("Secret:", f.secret),
