@@ -12,7 +12,9 @@ python_magic
 clamd
 
 # nsfw detection
-numpy
+torch
+transformers
+pillow
 
 # mod ui
 av

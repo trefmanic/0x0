@@ -95,12 +95,15 @@ Optional:
 NSFW Detection
 --------------
 
-0x0 supports classification of NSFW content via Yahoo’s open_nsfw Caffe
-neural network model. This works for images and video files and requires
-the following:
+0x0 supports classification of NSFW content via
+`a machine learning model <https://huggingface.co/giacomoarienti/nsfw-classifier>`_.
+This works for images and video files and requires the following
+Python modules:
 
-* Caffe Python module (built for Python 3)
-* `PyAV <https://github.com/PyAV-Org/PyAV>`_
+* torch
+* transformers
+* pillow
+* `av <https://github.com/PyAV-Org/PyAV>`_
 
 
 Virus Scanning

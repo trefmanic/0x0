@@ -176,7 +176,7 @@ NSFW_DETECT = False
 # are marked as NSFW.
 #
 # If NSFW_DETECT is set to False, then this has no effect.
-NSFW_THRESHOLD = 0.608
+NSFW_THRESHOLD = 0.92
 
 
 # If you want to scan files for viruses using ClamAV, specify the socket used

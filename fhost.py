@@ -70,7 +70,7 @@ app.config.update(
     ],
     FHOST_UPLOAD_BLACKLIST = None,
     NSFW_DETECT = False,
-    NSFW_THRESHOLD = 0.608,
+    NSFW_THRESHOLD = 0.92,
     VSCAN_SOCKET = None,
     VSCAN_QUARANTINE_PATH = "quarantine",
     VSCAN_IGNORE = [
