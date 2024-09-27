@@ -37,7 +37,6 @@ To change the expiration date (see above):
 
 {% set max_size = config["MAX_CONTENT_LENGTH"]|filesizeformat(True) %}
 Maximum file size: {{ max_size }}
-Not allowed: {{ config["FHOST_MIME_BLACKLIST"]|join(", ") }}
 
 
 FILE RETENTION PERIOD
