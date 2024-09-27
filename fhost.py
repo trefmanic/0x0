@@ -27,7 +27,7 @@ from sqlalchemy.orm import declared_attr
 import sqlalchemy.types as types
 from jinja2.exceptions import *
 from jinja2 import ChoiceLoader, FileSystemLoader
-from hashlib import sha256
+from hashlib import file_digest
 from magic import Magic
 from mimetypes import guess_extension
 import click
@@ -248,11 +248,14 @@ class File(db.Model):
     @staticmethod
     def store(file_, requested_expiration: typing.Optional[int], addr, ua,
               secret: bool):
-        data = file_.read()
-        digest = sha256(data).hexdigest()
+        fstream = file_.stream
+        digest = file_digest(fstream, "sha256").hexdigest()
+        fstream.seek(0, os.SEEK_END)
+        flen = fstream.tell()
+        fstream.seek(0)
 
         def get_mime():
-            guess = mimedetect.from_buffer(data)
+            guess = mimedetect.from_descriptor(fstream.fileno())
             app.logger.debug(f"MIME - specified: '{file_.content_type}' - "
                              f"detected: '{guess}'")
 
@@ -295,7 +298,7 @@ class File(db.Model):
 
             return ext[:app.config["FHOST_MAX_EXT_LENGTH"]] or ".bin"
 
-        expiration = File.get_expiration(requested_expiration, len(data))
+        expiration = File.get_expiration(requested_expiration, flen)
         isnew = True
 
         f = File.query.filter_by(sha256=digest).first()
@@ -334,10 +337,9 @@ class File(db.Model):
         p = storage / digest
 
         if not p.is_file():
-            with open(p, "wb") as of:
-                of.write(data)
+            file_.save(p)
 
-        f.size = len(data)
+        f.size = flen
 
         if not f.nsfw_score and app.config["NSFW_DETECT"]:
             f.nsfw_score = nsfw.detect(str(p))
