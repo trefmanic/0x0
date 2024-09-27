@@ -80,15 +80,14 @@ app.config.update(
     URL_ALPHABET = "DEQhd2uFteibPwq0SWBInTpA_jcZL5GKz3YCR14Ulk87Jors9vNHgfaOmMXy6Vx-",
 )
 
-if not app.config["TESTING"]:
-    app.config.from_pyfile("config.py")
-    app.jinja_loader = ChoiceLoader([
-        FileSystemLoader(str(Path(app.instance_path) / "templates")),
-        app.jinja_loader
-    ])
+app.config.from_pyfile("config.py")
+app.jinja_loader = ChoiceLoader([
+    FileSystemLoader(str(Path(app.instance_path) / "templates")),
+    app.jinja_loader
+])
 
-    if app.config["DEBUG"]:
-        app.config["FHOST_USE_X_ACCEL_REDIRECT"] = False
+if app.config["DEBUG"]:
+    app.config["FHOST_USE_X_ACCEL_REDIRECT"] = False
 
 if app.config["NSFW_DETECT"]:
     from nsfw_detect import NSFWDetector
