@@ -5,4 +5,4 @@ print("Instead, please run")
 print("")
 print("   $ FLASK_APP=fhost flask prune")
 print("")
-exit(1);
+exit(1)

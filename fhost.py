@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    Copyright © 2020 Mia Herkt
+    Copyright © 2024 Mia Herkt
     Licensed under the EUPL, Version 1.2 or - as soon as approved
     by the European Commission - subsequent versions of the EUPL
     (the "License");
@@ -19,7 +18,8 @@
     and limitations under the License.
 """
 
-from flask import Flask, abort, make_response, redirect, request, send_from_directory, url_for, Response, render_template, Request
+from flask import Flask, abort, make_response, redirect, render_template, \
+    Request, request, Response, send_from_directory, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy import and_, or_
@@ -46,38 +46,41 @@ from pathlib import Path
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.update(
-    SQLALCHEMY_TRACK_MODIFICATIONS = False,
-    PREFERRED_URL_SCHEME = "https", # nginx users: make sure to have 'uwsgi_param UWSGI_SCHEME $scheme;' in your config
-    MAX_CONTENT_LENGTH = 256 * 1024 * 1024,
-    MAX_URL_LENGTH = 4096,
-    USE_X_SENDFILE = False,
-    FHOST_USE_X_ACCEL_REDIRECT = True, # expect nginx by default
-    FHOST_STORAGE_PATH = "up",
-    FHOST_MAX_EXT_LENGTH = 9,
-    FHOST_SECRET_BYTES = 16,
-    FHOST_EXT_OVERRIDE = {
-        "audio/flac" : ".flac",
-        "image/gif" : ".gif",
-        "image/jpeg" : ".jpg",
-        "image/png" : ".png",
-        "image/svg+xml" : ".svg",
-        "video/webm" : ".webm",
-        "video/x-matroska" : ".mkv",
-        "application/octet-stream" : ".bin",
-        "text/plain" : ".log",
-        "text/plain" : ".txt",
-        "text/x-diff" : ".diff",
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    PREFERRED_URL_SCHEME="https",  # nginx users: make sure to have
+                                   # 'uwsgi_param UWSGI_SCHEME $scheme;' in
+                                   # your config
+    MAX_CONTENT_LENGTH=256 * 1024 * 1024,
+    MAX_URL_LENGTH=4096,
+    USE_X_SENDFILE=False,
+    FHOST_USE_X_ACCEL_REDIRECT=True,  # expect nginx by default
+    FHOST_STORAGE_PATH="up",
+    FHOST_MAX_EXT_LENGTH=9,
+    FHOST_SECRET_BYTES=16,
+    FHOST_EXT_OVERRIDE={
+        "audio/flac": ".flac",
+        "image/gif": ".gif",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/svg+xml": ".svg",
+        "video/webm": ".webm",
+        "video/x-matroska": ".mkv",
+        "application/octet-stream": ".bin",
+        "text/plain": ".log",
+        "text/plain": ".txt",
+        "text/x-diff": ".diff",
     },
-    NSFW_DETECT = False,
-    NSFW_THRESHOLD = 0.92,
-    VSCAN_SOCKET = None,
-    VSCAN_QUARANTINE_PATH = "quarantine",
-    VSCAN_IGNORE = [
+    NSFW_DETECT=False,
+    NSFW_THRESHOLD=0.92,
+    VSCAN_SOCKET=None,
+    VSCAN_QUARANTINE_PATH="quarantine",
+    VSCAN_IGNORE=[
         "Eicar-Test-Signature",
         "PUA.Win.Packer.XmMusicFile",
     ],
-    VSCAN_INTERVAL = datetime.timedelta(days=7),
-    URL_ALPHABET = "DEQhd2uFteibPwq0SWBInTpA_jcZL5GKz3YCR14Ulk87Jors9vNHgfaOmMXy6Vx-",
+    VSCAN_INTERVAL=datetime.timedelta(days=7),
+    URL_ALPHABET="DEQhd2uFteibPwq0SWBInTpA_jcZL5GKz3YCR14Ulk87Jors9vNHgfaOmMX"
+                 "y6Vx-",
 )
 
 app.config.from_pyfile("config.py")
@@ -95,7 +98,7 @@ if app.config["NSFW_DETECT"]:
 
 try:
     mimedetect = Magic(mime=True, mime_encoding=False)
-except:
+except TypeError:
     print("""Error: You have installed the wrong version of the 'magic' module.
 Please install python-magic.""")
     sys.exit(1)
@@ -103,10 +106,11 @@ Please install python-magic.""")
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+
 class URL(db.Model):
     __tablename__ = "URL"
-    id = db.Column(db.Integer, primary_key = True)
-    url = db.Column(db.UnicodeText, unique = True)
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.UnicodeText, unique=True)
 
     def __init__(self, url):
         self.url = url
@@ -117,6 +121,7 @@ class URL(db.Model):
     def geturl(self):
         return url_for("get", path=self.getname(), _external=True) + "\n"
 
+    @staticmethod
     def get(url):
         u = URL.query.filter_by(url=url).first()
 
@@ -126,6 +131,7 @@ class URL(db.Model):
             db.session.commit()
 
         return u
+
 
 class IPAddress(types.TypeDecorator):
     impl = types.LargeBinary
@@ -150,8 +156,8 @@ class IPAddress(types.TypeDecorator):
 
 
 class File(db.Model):
-    id = db.Column(db.Integer, primary_key = True)
-    sha256 = db.Column(db.String, unique = True)
+    id = db.Column(db.Integer, primary_key=True)
+    sha256 = db.Column(db.String, unique=True)
     ext = db.Column(db.UnicodeText)
     mime = db.Column(db.UnicodeText)
     addr = db.Column(IPAddress(16))
@@ -175,18 +181,19 @@ class File(db.Model):
 
     @property
     def is_nsfw(self) -> bool:
-        return self.nsfw_score and self.nsfw_score > app.config["NSFW_THRESHOLD"]
+        if self.nsfw_score:
+            return self.nsfw_score > app.config["NSFW_THRESHOLD"]
+        return False
 
     def getname(self):
         return u"{0}{1}".format(su.enbase(self.id), self.ext)
 
     def geturl(self):
         n = self.getname()
+        a = "nsfw" if self.is_nsfw else None
 
-        if self.is_nsfw:
-            return url_for("get", path=n, secret=self.secret, _external=True, _anchor="nsfw") + "\n"
-        else:
-            return url_for("get", path=n, secret=self.secret, _external=True) + "\n"
+        return url_for("get", path=n, secret=self.secret,
+                       _external=True, _anchor=a) + "\n"
 
     def getpath(self) -> Path:
         return Path(app.config["FHOST_STORAGE_PATH"]) / self.sha256
@@ -197,33 +204,37 @@ class File(db.Model):
         self.removed = permanent
         self.getpath().unlink(missing_ok=True)
 
-    # Returns the epoch millisecond that a file should expire
-    #
-    # Uses the expiration time provided by the user (requested_expiration)
-    # upper-bounded by an algorithm that computes the size based on the size of the
-    # file.
-    #
-    # That is, all files are assigned a computed expiration, which can voluntarily
-    # shortened by the user either by providing a timestamp in epoch millis or a
-    # duration in hours.
+    """
+    Returns the epoch millisecond that a file should expire
+
+    Uses the expiration time provided by the user (requested_expiration)
+    upper-bounded by an algorithm that computes the size based on the size of
+    the file.
+
+    That is, all files are assigned a computed expiration, which can be
+    voluntarily shortened by the user either by providing a timestamp in
+    milliseconds since epoch or a duration in hours.
+    """
+    @staticmethod
     def get_expiration(requested_expiration, size) -> int:
-        current_epoch_millis = time.time() * 1000;
+        current_epoch_millis = time.time() * 1000
 
         # Maximum lifetime of the file in milliseconds
-        this_files_max_lifespan = get_max_lifespan(size);
+        max_lifespan = get_max_lifespan(size)
 
         # The latest allowed expiration date for this file, in epoch millis
-        this_files_max_expiration = this_files_max_lifespan + 1000 * time.time();
+        max_expiration = max_lifespan + 1000 * time.time()
 
         if requested_expiration is None:
-            return this_files_max_expiration
+            return max_expiration
         elif requested_expiration < 1650460320000:
             # Treat the requested expiration time as a duration in hours
             requested_expiration_ms = requested_expiration * 60 * 60 * 1000
-            return min(this_files_max_expiration, current_epoch_millis + requested_expiration_ms)
+            return min(max_expiration,
+                       current_epoch_millis + requested_expiration_ms)
         else:
-            # Treat the requested expiration time as a timestamp in epoch millis
-            return min(this_files_max_expiration, requested_expiration)
+            # Treat expiration time as a timestamp in epoch millis
+            return min(max_expiration, requested_expiration)
 
     """
     requested_expiration can be:
@@ -231,18 +242,23 @@ class File(db.Model):
         - a duration (in hours) that the file should live for
         - a timestamp in epoch millis that the file should expire at
 
-    Any value greater that the longest allowed file lifespan will be rounded down to that
-    value.
+    Any value greater that the longest allowed file lifespan will be rounded
+    down to that value.
     """
-    def store(file_, requested_expiration: typing.Optional[int], addr, ua, secret: bool):
+    @staticmethod
+    def store(file_, requested_expiration: typing.Optional[int], addr, ua,
+              secret: bool):
         data = file_.read()
         digest = sha256(data).hexdigest()
 
         def get_mime():
             guess = mimedetect.from_buffer(data)
-            app.logger.debug(f"MIME - specified: '{file_.content_type}' - detected: '{guess}'")
+            app.logger.debug(f"MIME - specified: '{file_.content_type}' - "
+                             f"detected: '{guess}'")
 
-            if not file_.content_type or not "/" in file_.content_type or file_.content_type == "application/octet-stream":
+            if (not file_.content_type
+                    or "/" not in file_.content_type
+                    or file_.content_type == "application/octet-stream"):
                 mime = guess
             else:
                 mime = file_.content_type
@@ -254,7 +270,7 @@ class File(db.Model):
                 if flt.check(guess):
                     abort(403, flt.reason)
 
-            if mime.startswith("text/") and not "charset" in mime:
+            if mime.startswith("text/") and "charset" not in mime:
                 mime += "; charset=utf-8"
 
             return mime
@@ -266,7 +282,8 @@ class File(db.Model):
             gmime = mime.split(";")[0]
             guess = guess_extension(gmime)
 
-            app.logger.debug(f"extension - specified: '{ext}' - detected: '{guess}'")
+            app.logger.debug(f"extension - specified: '{ext}' - detected: "
+                             f"'{guess}'")
 
             if not ext:
                 if gmime in app.config["FHOST_EXT_OVERRIDE"]:
@@ -309,7 +326,8 @@ class File(db.Model):
         if isnew:
             f.secret = None
             if secret:
-                f.secret = secrets.token_urlsafe(app.config["FHOST_SECRET_BYTES"])
+                f.secret = \
+                    secrets.token_urlsafe(app.config["FHOST_SECRET_BYTES"])
 
         storage = Path(app.config["FHOST_STORAGE_PATH"])
         storage.mkdir(parents=True, exist_ok=True)
@@ -451,7 +469,7 @@ class UAFilter(HasRegex, RequestFilter):
 
 
 class UrlEncoder(object):
-    def __init__(self,alphabet, min_length):
+    def __init__(self, alphabet, min_length):
         self.alphabet = alphabet
         self.min_length = min_length
 
@@ -471,7 +489,9 @@ class UrlEncoder(object):
             result += self.alphabet.index(c) * (n ** i)
         return result
 
+
 su = UrlEncoder(alphabet=app.config["URL_ALPHABET"], min_length=1)
+
 
 def fhost_url(scheme=None):
     if not scheme:
@@ -479,8 +499,10 @@ def fhost_url(scheme=None):
     else:
         return url_for(".fhost", _external=True, _scheme=scheme).rstrip("/")
 
+
 def is_fhost_url(url):
     return url.startswith(fhost_url()) or url.startswith(fhost_url("https"))
+
 
 def shorten(url):
     if len(url) > app.config["MAX_URL_LENGTH"]:
@@ -493,16 +515,18 @@ def shorten(url):
 
     return u.geturl()
 
+
 """
 requested_expiration can be:
     - None, to use the longest allowed file lifespan
     - a duration (in hours) that the file should live for
     - a timestamp in epoch millis that the file should expire at
 
-Any value greater that the longest allowed file lifespan will be rounded down to that
-value.
+Any value greater that the longest allowed file lifespan will be rounded down
+to that value.
 """
-def store_file(f, requested_expiration: typing.Optional[int], addr, ua, secret: bool):
+def store_file(f, requested_expiration: typing.Optional[int], addr, ua,
+               secret: bool):
     sf, isnew = File.store(f, requested_expiration, addr, ua, secret)
 
     response = make_response(sf.geturl())
@@ -513,11 +537,12 @@ def store_file(f, requested_expiration: typing.Optional[int], addr, ua, secret: 
 
     return response
 
+
 def store_url(url, addr, ua, secret: bool):
     if is_fhost_url(url):
         abort(400)
 
-    h = { "Accept-Encoding" : "identity" }
+    h = {"Accept-Encoding": "identity"}
     r = requests.get(url, stream=True, verify=False, headers=h)
 
     try:
@@ -526,13 +551,14 @@ def store_url(url, addr, ua, secret: bool):
         return str(e) + "\n"
 
     if "content-length" in r.headers:
-        l = int(r.headers["content-length"])
+        length = int(r.headers["content-length"])
 
-        if l <= app.config["MAX_CONTENT_LENGTH"]:
+        if length <= app.config["MAX_CONTENT_LENGTH"]:
             def urlfile(**kwargs):
-                return type('',(),kwargs)()
+                return type('', (), kwargs)()
 
-            f = urlfile(read=r.raw.read, content_type=r.headers["content-type"], filename="")
+            f = urlfile(read=r.raw.read,
+                        content_type=r.headers["content-type"], filename="")
 
             return store_file(f, None, addr, ua, secret)
         else:
@@ -540,10 +566,9 @@ def store_url(url, addr, ua, secret: bool):
     else:
         abort(411)
 
+
 def manage_file(f):
-    try:
-        assert(request.form["token"] == f.mgmt_token)
-    except:
+    if request.form["token"] != f.mgmt_token:
         abort(401)
 
     if "delete" in request.form:
@@ -561,6 +586,7 @@ def manage_file(f):
         return "", 202
 
     abort(400)
+
 
 @app.route("/<path:path>", methods=["GET", "POST"])
 @app.route("/s/<secret>/<path:path>", methods=["GET", "POST"])
@@ -598,7 +624,9 @@ def get(path, secret=None):
                 response.headers["Content-Length"] = f.size
                 response.headers["X-Accel-Redirect"] = "/" + str(fpath)
             else:
-                response = send_from_directory(app.config["FHOST_STORAGE_PATH"], f.sha256, mimetype = f.mime)
+                response = send_from_directory(
+                    app.config["FHOST_STORAGE_PATH"], f.sha256,
+                    mimetype=f.mime)
 
             response.headers["X-Expires"] = f.expiration
             return response
@@ -615,6 +643,7 @@ def get(path, secret=None):
             return redirect(u.url)
 
     abort(404)
+
 
 @app.route("/", methods=["GET", "POST"])
 def fhost():
@@ -665,11 +694,13 @@ def fhost():
     else:
         return render_template("index.html")
 
+
 @app.route("/robots.txt")
 def robots():
     return """User-agent: *
 Disallow: /
 """
+
 
 @app.errorhandler(400)
 @app.errorhandler(401)
@@ -682,20 +713,23 @@ Disallow: /
 @app.errorhandler(451)
 def ehandler(e):
     try:
-        return render_template(f"{e.code}.html", id=id, request=request, description=e.description), e.code
+        return render_template(f"{e.code}.html", id=id, request=request,
+                               description=e.description), e.code
     except TemplateNotFound:
         return "Segmentation fault\n", e.code
+
 
 @app.cli.command("prune")
 def prune():
     """
     Clean up expired files
 
-    Deletes any files from the filesystem which have hit their expiration time.  This
-    doesn't remove them from the database, only from the filesystem.  It's recommended
-    that server owners run this command regularly, or set it up on a timer.
+    Deletes any files from the filesystem which have hit their expiration time.
+    This doesn't remove them from the database, only from the filesystem.
+    It is recommended that server owners run this command regularly, or set it
+    up on a timer.
     """
-    current_time = time.time() * 1000;
+    current_time = time.time() * 1000
 
     # The path to where uploaded files are stored
     storage = Path(app.config["FHOST_STORAGE_PATH"])
@@ -709,7 +743,7 @@ def prune():
             )
         )
 
-    files_removed = 0;
+    files_removed = 0
 
     # For every expired file...
     for file in expired_files:
@@ -722,31 +756,33 @@ def prune():
         # Remove it from the file system
         try:
             os.remove(file_path)
-            files_removed += 1;
+            files_removed += 1
         except FileNotFoundError:
-            pass # If the file was already gone, we're good
+            pass  # If the file was already gone, we're good
         except OSError as e:
             print(e)
             print(
                 "\n------------------------------------"
-                "Encountered an error while trying to remove file {file_path}.  Double"
-                "check to make sure the server is configured correctly, permissions are"
-                "okay, and everything is ship shape, then try again.")
-            return;
+                "Encountered an error while trying to remove file {file_path}."
+                "Make sure the server is configured correctly, permissions "
+                "are okay, and everything is ship shape, then try again.")
+            return
 
         # Finally, mark that the file was removed
-        file.expiration = None;
+        file.expiration = None
     db.session.commit()
 
     print(f"\nDone!  {files_removed} file(s) removed")
 
-""" For a file of a given size, determine the largest allowed lifespan of that file
 
-Based on the current app's configuration:  Specifically, the MAX_CONTENT_LENGTH, as well
-as FHOST_{MIN,MAX}_EXPIRATION.
+"""
+For a file of a given size, determine the largest allowed lifespan of that file
 
-This lifespan may be shortened by a user's request, but no files should be allowed to
-expire at a point after this number.
+Based on the current app's configuration:
+Specifically, the  MAX_CONTENT_LENGTH, as well as FHOST_{MIN,MAX}_EXPIRATION.
+
+This lifespan may be shortened by a user's request, but no files should be
+allowed to expire at a point after this number.
 
 Value returned is a duration in milliseconds.
 """
@@ -756,11 +792,13 @@ def get_max_lifespan(filesize: int) -> int:
     max_size = app.config.get("MAX_CONTENT_LENGTH", 256 * 1024 * 1024)
     return min_exp + int((-max_exp + min_exp) * (filesize / max_size - 1) ** 3)
 
+
 def do_vscan(f):
     if f["path"].is_file():
         with open(f["path"], "rb") as scanf:
             try:
-                f["result"] = list(app.config["VSCAN_SOCKET"].instream(scanf).values())[0]
+                res = list(app.config["VSCAN_SOCKET"].instream(scanf).values())
+                f["result"] = res[0]
             except:
                 f["result"] = ("SCAN FAILED", None)
     else:
@@ -768,11 +806,12 @@ def do_vscan(f):
 
     return f
 
+
 @app.cli.command("vscan")
 def vscan():
     if not app.config["VSCAN_SOCKET"]:
-        print("""Error: Virus scanning enabled but no connection method specified.
-Please set VSCAN_SOCKET.""")
+        print("Error: Virus scanning enabled but no connection method "
+              "specified.\nPlease set VSCAN_SOCKET.")
         sys.exit(1)
 
     qp = Path(app.config["VSCAN_QUARANTINE_PATH"])
@@ -786,9 +825,11 @@ Please set VSCAN_SOCKET.""")
                                         File.last_vscan == None),
                                     File.removed == False)
         else:
-            res = File.query.filter(File.last_vscan == None, File.removed == False)
+            res = File.query.filter(File.last_vscan == None,
+                                    File.removed == False)
 
-        work = [{"path" : f.getpath(), "name" : f.getname(), "id" : f.id} for f in res]
+        work = [{"path": f.getpath(), "name": f.getname(), "id": f.id}
+                for f in res]
 
         results = []
         for i, r in enumerate(p.imap_unordered(do_vscan, work)):
@@ -802,9 +843,10 @@ Please set VSCAN_SOCKET.""")
                     found = True
 
             results.append({
-                "id" : r["id"],
-                "last_vscan" : None if r["result"][0] == "SCAN FAILED" else datetime.datetime.now(),
-                "removed" : found})
+                "id": r["id"],
+                "last_vscan": None if r["result"][0] == "SCAN FAILED"
+                else datetime.datetime.now(),
+                "removed": found})
 
         db.session.bulk_update_mappings(File, results)
         db.session.commit()

@@ -2,46 +2,46 @@ from enum import Enum
 from textual import log
 
 mimemoji = {
-    "audio" : "🔈",
-    "video" : "🎞",
-    "text"  : "📄",
-    "image" : "🖼",
-    "application/zip" : "🗜️",
-    "application/x-zip-compressed" : "🗜️",
-    "application/x-tar" : "🗄",
-    "application/x-cpio" : "🗄",
-    "application/x-xz" : "🗜️",
-    "application/x-7z-compressed" : "🗜️",
-    "application/gzip" : "🗜️",
-    "application/zstd" : "🗜️",
-    "application/x-rar" : "🗜️",
-    "application/x-rar-compressed" : "🗜️",
-    "application/vnd.ms-cab-compressed" : "🗜️",
-    "application/x-bzip2" : "🗜️",
-    "application/x-lzip" : "🗜️",
-    "application/x-iso9660-image" : "💿",
-    "application/pdf" : "📕",
-    "application/epub+zip" : "📕",
-    "application/mxf" : "🎞",
-    "application/vnd.android.package-archive" : "📦",
-    "application/vnd.debian.binary-package" : "📦",
-    "application/x-rpm" : "📦",
-    "application/x-dosexec" : "⚙",
-    "application/x-execuftable" : "⚙",
-    "application/x-sharedlib" : "⚙",
-    "application/java-archive" : "☕",
-    "application/x-qemu-disk" : "🖴",
-    "application/pgp-encrypted" : "🔏",
+    "audio": "🔈",
+    "video": "🎞",
+    "text": "📄",
+    "image": "🖼",
+    "application/zip": "🗜️",
+    "application/x-zip-compressed": "🗜️",
+    "application/x-tar": "🗄",
+    "application/x-cpio": "🗄",
+    "application/x-xz": "🗜️",
+    "application/x-7z-compressed": "🗜️",
+    "application/gzip": "🗜️",
+    "application/zstd": "🗜️",
+    "application/x-rar": "🗜️",
+    "application/x-rar-compressed": "🗜️",
+    "application/vnd.ms-cab-compressed": "🗜️",
+    "application/x-bzip2": "🗜️",
+    "application/x-lzip": "🗜️",
+    "application/x-iso9660-image": "💿",
+    "application/pdf": "📕",
+    "application/epub+zip": "📕",
+    "application/mxf": "🎞",
+    "application/vnd.android.package-archive": "📦",
+    "application/vnd.debian.binary-package": "📦",
+    "application/x-rpm": "📦",
+    "application/x-dosexec": "⚙",
+    "application/x-execuftable": "⚙",
+    "application/x-sharedlib": "⚙",
+    "application/java-archive": "☕",
+    "application/x-qemu-disk": "🖴",
+    "application/pgp-encrypted": "🔏",
 }
 
-MIMECategory = Enum("MIMECategory",
-    ["Archive", "Text", "AV", "Document", "Fallback"]
-)
+MIMECategory = Enum("MIMECategory", ["Archive", "Text", "AV", "Document",
+                                     "Fallback"])
+
 
 class MIMEHandler:
     def __init__(self):
         self.handlers = {
-            MIMECategory.Archive : [[
+            MIMECategory.Archive: [[
                 "application/zip",
                 "application/x-zip-compressed",
                 "application/x-tar",
@@ -62,31 +62,31 @@ class MIMEHandler:
                 "application/java-archive",
                 "application/vnd.openxmlformats"
             ], []],
-            MIMECategory.Text : [[
+            MIMECategory.Text: [[
                 "text",
                 "application/json",
                 "application/xml",
             ], []],
-            MIMECategory.AV : [[
+            MIMECategory.AV: [[
                 "audio", "video", "image",
                 "application/mxf"
             ], []],
-            MIMECategory.Document : [[
+            MIMECategory.Document: [[
                 "application/pdf",
                 "application/epub",
                 "application/x-mobipocket-ebook",
             ], []],
-            MIMECategory.Fallback : [[], []]
+            MIMECategory.Fallback: [[], []]
         }
 
         self.exceptions = {
-            MIMECategory.Archive : {
-                ".cbz" : MIMECategory.Document,
-                ".xps" : MIMECategory.Document,
-                ".epub" : MIMECategory.Document,
+            MIMECategory.Archive: {
+                ".cbz": MIMECategory.Document,
+                ".xps": MIMECategory.Document,
+                ".epub": MIMECategory.Document,
             },
-            MIMECategory.Text : {
-                ".fb2" : MIMECategory.Document,
+            MIMECategory.Text: {
+                ".fb2": MIMECategory.Document,
             }
         }
 
@@ -115,12 +115,14 @@ class MIMEHandler:
         cat = getcat(mime)
         for handler in self.handlers[cat][1]:
             try:
-                if handler(cat): return
+                if handler(cat):
+                    return
             except: pass
 
         for handler in self.handlers[MIMECategory.Fallback][1]:
             try:
-                if handler(None): return
+                if handler(None):
+                    return
             except: pass
 
         raise RuntimeError(f"Unhandled MIME type category: {cat}")

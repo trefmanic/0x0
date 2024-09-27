@@ -18,31 +18,33 @@
     and limitations under the License.
 """
 
-import os
 import sys
-from pathlib import Path
-
 import av
 from transformers import pipeline
 
+
 class NSFWDetector:
     def __init__(self):
-        self.classifier = pipeline("image-classification", model="giacomoarienti/nsfw-classifier")
+        self.classifier = pipeline("image-classification",
+                                   model="giacomoarienti/nsfw-classifier")
 
     def detect(self, fpath):
         try:
             with av.open(fpath) as container:
-                try: container.seek(int(container.duration / 2))
+                try:
+                    container.seek(int(container.duration / 2))
                 except: container.seek(0)
 
                 frame = next(container.decode(video=0))
                 img = frame.to_image()
                 res = self.classifier(img)
 
-                return max([x["score"] for x in res if x["label"] not in ["neutral", "drawings"]])
+                return max([x["score"] for x in res
+                            if x["label"] not in ["neutral", "drawings"]])
         except: pass
 
         return -1.0
+
 
 if __name__ == "__main__":
     n = NSFWDetector()

@@ -7,12 +7,14 @@ from jinja2.filters import do_filesizeformat
 from fhost import File
 from modui import mime
 
+
 class FileTable(DataTable):
     query = Reactive(None)
     order_col = Reactive(0)
     order_desc = Reactive(True)
     limit = 10000
-    colmap = [File.id, File.removed, File.nsfw_score, None, File.ext, File.size, File.mime]
+    colmap = [File.id, File.removed, File.nsfw_score, None, File.ext,
+              File.size, File.mime]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -33,6 +35,8 @@ class FileTable(DataTable):
 
     def watch_query(self, old, value) -> None:
         def fmt_file(f: File) -> tuple:
+            mimemoji = mime.mimemoji.get(f.mime.split('/')[0],
+                                         mime.mimemoji.get(f.mime)) or '  '
             return (
                 str(f.id),
                 "🔴" if f.removed else "  ",
@@ -40,14 +44,15 @@ class FileTable(DataTable):
                 "👻" if not f.getpath().is_file() else "  ",
                 f.getname(),
                 do_filesizeformat(f.size, True),
-                f"{mime.mimemoji.get(f.mime.split('/')[0], mime.mimemoji.get(f.mime)) or '  '} " + f.mime,
+                f"{mimemoji} {f.mime}",
             )
 
         if (self.query):
-
             order = FileTable.colmap[self.order_col]
             q = self.query
-            if order: q = q.order_by(order.desc() if self.order_desc else order, File.id)
+            if order:
+                q = q.order_by(order.desc() if self.order_desc
+                               else order, File.id)
             qres = list(map(fmt_file, q.limit(self.limit)))
 
             ri = 0

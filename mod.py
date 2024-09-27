@@ -14,9 +14,10 @@ from jinja2.filters import do_filesizeformat
 import ipaddress
 
 from fhost import db, File, AddrFilter, su, app as fhost_app
-from modui import *
+from modui import FileTable, mime, MpvWidget, Notification
 
 fhost_app.app_context().push()
+
 
 class NullptrMod(Screen):
     BINDINGS = [
@@ -67,53 +68,58 @@ class NullptrMod(Screen):
         self.finput.display = False
         ftable = self.query_one("#ftable")
         ftable.focus()
+        q = ftable.base_query
 
         if len(message.value):
             match self.filter_col:
                 case 1:
-                    try: ftable.query = ftable.base_query.filter(File.id == su.debase(message.value))
-                    except ValueError: pass
+                    try:
+                        q = q.filter(File.id == su.debase(message.value))
+                    except ValueError:
+                        return
                 case 2:
                     try:
                         addr = ipaddress.ip_address(message.value)
                         if type(addr) is ipaddress.IPv6Address:
                             addr = addr.ipv4_mapped or addr
-                        q = ftable.base_query.filter(File.addr == addr)
-                        ftable.query = q
-                    except ValueError: pass
-                case 3: ftable.query = ftable.base_query.filter(File.mime.like(message.value))
-                case 4: ftable.query = ftable.base_query.filter(File.ext.like(message.value))
-                case 5: ftable.query = ftable.base_query.filter(File.ua.like(message.value))
-        else:
-            ftable.query = ftable.base_query
+                        q = q.filter(File.addr == addr)
+                    except ValueError:
+                        return
+                case 3: q = q.filter(File.mime.like(message.value))
+                case 4: q = q.filter(File.ext.like(message.value))
+                case 5: q = q.filter(File.ua.like(message.value))
+
+        ftable.query = q
 
     def action_remove_file(self, permanent: bool) -> None:
         if self.current_file:
             self.current_file.delete(permanent)
             db.session.commit()
-            self.mount(Notification(f"{'Banned' if permanent else 'Removed'} file {self.current_file.getname()}"))
+            self.mount(Notification(f"{'Banned' if permanent else 'Removed'}"
+                                    f"file {self.current_file.getname()}"))
             self.action_refresh()
 
     def action_ban_ip(self, nuke: bool) -> None:
         if self.current_file:
-            if AddrFilter.query.filter(AddrFilter.addr ==
-                                       self.current_file.addr).scalar():
-                txt = f"{self.current_file.addr.compressed} is already banned"
+            addr = self.current_file.addr
+            if AddrFilter.query.filter(AddrFilter.addr == addr).scalar():
+                txt = f"{addr.compressed} is already banned"
             else:
-                db.session.add(AddrFilter(self.current_file.addr))
+                db.session.add(AddrFilter(addr))
                 db.session.commit()
-                txt = f"Banned {self.current_file.addr.compressed}"
+                txt = f"Banned {addr.compressed}"
 
             if nuke:
                 tsize = 0
                 trm = 0
-                for f in File.query.filter(File.addr == self.current_file.addr):
+                for f in File.query.filter(File.addr == addr):
                     if f.getpath().is_file():
                         tsize += f.size or f.getpath().stat().st_size
                         trm += 1
                     f.delete(True)
                 db.session.commit()
-                txt += f", removed {trm} {'files' if trm != 1 else 'file'} totaling {do_filesizeformat(tsize, True)}"
+                txt += f", removed {trm} {'files' if trm != 1 else 'file'} " \
+                       f"totaling {do_filesizeformat(tsize, True)}"
             self.mount(Notification(txt))
             self._refresh_layout()
             ftable = self.query_one("#ftable")
@@ -131,7 +137,7 @@ class NullptrMod(Screen):
                 DataTable(id="finfo", show_header=False, cursor_type="none"),
                 MpvWidget(id="mpv"),
                 RichLog(id="ftextlog", auto_scroll=False),
-            id="infopane"))
+                id="infopane"))
         yield Input(id="filter_input")
         yield Footer()
 
@@ -150,11 +156,14 @@ class NullptrMod(Screen):
         self.finput = self.query_one("#filter_input")
 
         self.mimehandler = mime.MIMEHandler()
-        self.mimehandler.register(mime.MIMECategory.Archive, self.handle_libarchive)
+        self.mimehandler.register(mime.MIMECategory.Archive,
+                                  self.handle_libarchive)
         self.mimehandler.register(mime.MIMECategory.Text, self.handle_text)
         self.mimehandler.register(mime.MIMECategory.AV, self.handle_mpv)
-        self.mimehandler.register(mime.MIMECategory.Document, self.handle_mupdf)
-        self.mimehandler.register(mime.MIMECategory.Fallback, self.handle_libarchive)
+        self.mimehandler.register(mime.MIMECategory.Document,
+                                  self.handle_mupdf)
+        self.mimehandler.register(mime.MIMECategory.Fallback,
+                                  self.handle_libarchive)
         self.mimehandler.register(mime.MIMECategory.Fallback, self.handle_mpv)
         self.mimehandler.register(mime.MIMECategory.Fallback, self.handle_raw)
 
@@ -166,7 +175,7 @@ class NullptrMod(Screen):
 
     def handle_text(self, cat):
         with open(self.current_file.getpath(), "r") as sf:
-            data = sf.read(1000000).replace("\033","")
+            data = sf.read(1000000).replace("\033", "")
             self.ftlog.write(data)
         return True
 
@@ -181,7 +190,8 @@ class NullptrMod(Screen):
             self.mpvw.styles.height = "40%"
             self.mpvw.start_mpv("hex://" + imgdata, 0)
 
-            self.ftlog.write(Text.from_markup(f"[bold]Pages:[/bold] {doc.page_count}"))
+            self.ftlog.write(
+                Text.from_markup(f"[bold]Pages:[/bold] {doc.page_count}"))
             self.ftlog.write(Text.from_markup("[bold]Metadata:[/bold]"))
             for k, v in doc.metadata.items():
                 self.ftlog.write(Text.from_markup(f"  [bold]{k}:[/bold] {v}"))
@@ -206,7 +216,8 @@ class NullptrMod(Screen):
                     for k, v in c.metadata.items():
                         self.ftlog.write(f"  {k}: {v}")
                     for s in c.streams:
-                        self.ftlog.write(Text(f"Stream {s.index}:", style="bold"))
+                        self.ftlog.write(
+                            Text(f"Stream {s.index}:", style="bold"))
                         self.ftlog.write(f"  Type: {s.type}")
                         if s.base_rate:
                             self.ftlog.write(f"  Frame rate: {s.base_rate}")
@@ -225,24 +236,31 @@ class NullptrMod(Screen):
                 else:
                     c = chr(s)
                     s = c
-                if c.isalpha(): return f"\0[chartreuse1]{s}\0[/chartreuse1]"
-                if c.isdigit(): return f"\0[gold1]{s}\0[/gold1]"
+                if c.isalpha():
+                    return f"\0[chartreuse1]{s}\0[/chartreuse1]"
+                if c.isdigit():
+                    return f"\0[gold1]{s}\0[/gold1]"
                 if not c.isprintable():
                     g = "grey50" if c == "\0" else "cadet_blue"
                     return f"\0[{g}]{s if len(s) == 2 else '.'}\0[/{g}]"
                 return s
-            return Text.from_markup("\n".join(f"{' '.join(map(fmt, map(''.join, zip(*[iter(c.hex())] * 2))))}"
-                                    f"{'   ' * (16 - len(c))}"
-                                    f" {''.join(map(fmt, c))}"
-                                    for c in map(lambda x: bytes([n for n in x if n != None]),
-                                                zip_longest(*[iter(binf.read(min(length, 16 * 10)))] * 16))))
+
+            return Text.from_markup(
+                "\n".join(' '.join(
+                    map(fmt, map(''.join, zip(*[iter(c.hex())] * 2)))) +
+                    f"{'   ' * (16 - len(c))} {''.join(map(fmt, c))}"
+                    for c in
+                    map(lambda x: bytes([n for n in x if n is not None]),
+                        zip_longest(
+                            *[iter(binf.read(min(length, 16 * 10)))] * 16))))
 
         with open(self.current_file.getpath(), "rb") as binf:
             self.ftlog.write(hexdump(binf, self.current_file.size))
             if self.current_file.size > 16*10*2:
                 binf.seek(self.current_file.size-16*10)
                 self.ftlog.write("  [...]  ".center(64, '─'))
-            self.ftlog.write(hexdump(binf, self.current_file.size - binf.tell()))
+            self.ftlog.write(hexdump(binf,
+                                     self.current_file.size - binf.tell()))
 
         return True
 
@@ -253,7 +271,9 @@ class NullptrMod(Screen):
         self.finfo.add_rows([
             ("ID:", str(f.id)),
             ("File name:", f.getname()),
-            ("URL:", f.geturl() if fhost_app.config["SERVER_NAME"] else "⚠ Set SERVER_NAME in config.py to display"),
+            ("URL:", f.geturl()
+             if fhost_app.config["SERVER_NAME"]
+             else "⚠ Set SERVER_NAME in config.py to display"),
             ("File size:", do_filesizeformat(f.size, True)),
             ("MIME type:", f.mime),
             ("SHA256 checksum:", f.sha256),
@@ -261,9 +281,14 @@ class NullptrMod(Screen):
             ("User agent:", Text(f.ua or "")),
             ("Management token:", f.mgmt_token),
             ("Secret:", f.secret),
-            ("Is NSFW:", ("Yes" if f.is_nsfw else "No") + (f" (Score: {f.nsfw_score:0.4f})" if f.nsfw_score else " (Not scanned)")),
+            ("Is NSFW:", ("Yes" if f.is_nsfw else "No") +
+             (f" (Score: {f.nsfw_score:0.4f})"
+              if f.nsfw_score else " (Not scanned)")),
             ("Is banned:", "Yes" if f.removed else "No"),
-            ("Expires:", time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(File.get_expiration(f.expiration, f.size)/1000)))
+            ("Expires:",
+             time.strftime("%Y-%m-%d %H:%M:%S",
+                           time.gmtime(File.get_expiration(f.expiration,
+                                                           f.size)/1000)))
         ])
 
         self.mpvw.stop_mpv(True)
@@ -273,6 +298,7 @@ class NullptrMod(Screen):
             self.mimehandler.handle(f.mime, f.ext)
             self.ftlog.scroll_to(x=0, y=0, animate=False)
 
+
 class NullptrModApp(App):
     CSS_PATH = "mod.css"
 
@@ -281,6 +307,7 @@ class NullptrModApp(App):
         self.main_screen = NullptrMod()
         self.install_screen(self.main_screen, name="main")
         self.push_screen("main")
+
 
 if __name__ == "__main__":
     app = NullptrModApp()

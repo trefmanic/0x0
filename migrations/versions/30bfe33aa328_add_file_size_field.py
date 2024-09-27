@@ -19,6 +19,7 @@ from pathlib import Path
 
 Base = automap_base()
 
+
 def upgrade():
     op.add_column('file', sa.Column('size', sa.BigInteger(), nullable=True))
     bind = op.get_bind()
@@ -34,8 +35,8 @@ def upgrade():
         p = storage / f.sha256
         if p.is_file():
             updates.append({
-                "id" : f.id,
-                "size" : p.stat().st_size
+                "id": f.id,
+                "size": p.stat().st_size
             })
 
     session.bulk_update_mappings(File, updates)

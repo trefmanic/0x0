@@ -21,23 +21,28 @@ from sqlalchemy.orm import Session
 import os
 import time
 
-""" For a file of a given size, determine the largest allowed lifespan of that file
 
-Based on the current app's configuration:  Specifically, the MAX_CONTENT_LENGTH, as well
-as FHOST_{MIN,MAX}_EXPIRATION.
+"""
+For a file of a given size, determine the largest allowed lifespan of that file
 
-This lifespan may be shortened by a user's request, but no files should be allowed to
-expire at a point after this number.
+Based on the current app's configuration:
+Specifically, the MAX_CONTENT_LENGTH, as well as FHOST_{MIN,MAX}_EXPIRATION.
+
+This lifespan may be shortened by a user's request, but no files should be
+allowed to expire at a point after this number.
 
 Value returned is a duration in milliseconds.
 """
 def get_max_lifespan(filesize: int) -> int:
-    min_exp = current_app.config.get("FHOST_MIN_EXPIRATION", 30 * 24 * 60 * 60 * 1000)
-    max_exp = current_app.config.get("FHOST_MAX_EXPIRATION", 365 * 24 * 60 * 60 * 1000)
-    max_size = current_app.config.get("MAX_CONTENT_LENGTH", 256 * 1024 * 1024)
+    cfg = current_app.config
+    min_exp = cfg.get("FHOST_MIN_EXPIRATION", 30 * 24 * 60 * 60 * 1000)
+    max_exp = cfg.get("FHOST_MAX_EXPIRATION", 365 * 24 * 60 * 60 * 1000)
+    max_size = cfg.get("MAX_CONTENT_LENGTH", 256 * 1024 * 1024)
     return min_exp + int((-max_exp + min_exp) * (filesize / max_size - 1) ** 3)
 
+
 Base = automap_base()
+
 
 def upgrade():
     op.add_column('file', sa.Column('expiration', sa.BigInteger()))
@@ -48,14 +53,14 @@ def upgrade():
     session = Session(bind=bind)
 
     storage = Path(current_app.config["FHOST_STORAGE_PATH"])
-    current_time = time.time() * 1000;
+    current_time = time.time() * 1000
 
     # List of file hashes which have not expired yet
     # This could get really big for some servers
     try:
         unexpired_files = os.listdir(storage)
     except FileNotFoundError:
-        return # There are no currently unexpired files
+        return  # There are no currently unexpired files
 
     # Calculate an expiration date for all existing files
 
@@ -65,7 +70,7 @@ def upgrade():
                 sa.not_(File.removed)
             )
         )
-    updates = [] # We coalesce updates to the database here
+    updates = []  # We coalesce updates to the database here
 
     # SQLite has a hard limit on the number of variables so we
     # need to do this the slow way
@@ -74,13 +79,18 @@ def upgrade():
     for file in files:
         file_path = storage / file.sha256
         stat = os.stat(file_path)
-        max_age = get_max_lifespan(stat.st_size) # How long the file is allowed to live, in ms
-        file_birth = stat.st_mtime * 1000 # When the file was created, in ms
-        updates.append({'id': file.id, 'expiration': int(file_birth + max_age)})
+        # How long the file is allowed to live, in ms
+        max_age = get_max_lifespan(stat.st_size)
+        # When the file was created, in ms
+        file_birth = stat.st_mtime * 1000
+        updates.append({
+            'id': file.id,
+            'expiration': int(file_birth + max_age)})
 
     # Apply coalesced updates
     session.bulk_update_mappings(File, updates)
     session.commit()
+
 
 def downgrade():
     op.drop_column('file', 'expiration')
