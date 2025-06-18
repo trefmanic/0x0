@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  web:
+    build: .
+    container_name: "0x0"
+    command: uwsgi --ini /app/0x0.ini
+    ports:
+      - "8420:8420"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
