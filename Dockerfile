@@ -4,9 +4,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     libmagic1 \
+    nginx \
     && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /run/nginx /var/cache/nginx
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-CMD ["uwsgi", "--ini", "/0x0.ini"]
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8420
+
+ENTRYPOINT ["/entrypoint.sh"]
