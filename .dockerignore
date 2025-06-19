@@ -1,0 +1,13 @@
+.git
+instance/config.example.py
+instance/db.sqlite
+up
+0x0-prune.*
+0x0-vscan.*
+docker-compose.yml
+Dockerfile
+modui.webp
+pyproject.toml
+README.rst
+.gitignore
+.mailmap
