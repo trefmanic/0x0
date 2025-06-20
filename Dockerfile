@@ -5,8 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     libmagic1 \
     libmpv2 \
+    mpv \
     nginx \
-    kitty \
     && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /run/nginx /var/cache/nginx
 WORKDIR /app
