@@ -10,3 +10,5 @@ services:
       - ./up:/app/up
     environment:
       - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    
